@@ -233,10 +233,7 @@ namespace CollectPMUs
 
             public void Append()
             {
-                lock (file)
-                {
-                    file.WriteLine(sTextToAppend);
-                }
+                file.WriteLine(sTextToAppend);
             }
         }
 
@@ -255,7 +252,7 @@ namespace CollectPMUs
             StreamWriter localLog;
             AppendOnFile appendOnLog = new AppendOnFile();
             string sLocalOutputFileName = "";
-            string sLogText = "";
+            StringBuilder sLogText = new StringBuilder();
             TransferUtility transfer = new TransferUtility(new AmazonS3Client(Amazon.RegionEndpoint.USEast1));
 
             transfer.Download("log.dat", "pmu-data", "log.dat");
@@ -289,7 +286,7 @@ namespace CollectPMUs
                     }
                 }
 
-                sLogText = sLogText + Environment.NewLine + "# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
                 // Due to the instability of the openPDC service that will be called, the PMUs will be
                 // divided in subsets of 4, and for each of these subsets the service will be called
@@ -305,7 +302,7 @@ namespace CollectPMUs
                 iNbOfCalls = iNbOfPMUsSubsets * 6; // For each subset the service will be called 6 times
                 // (intervals of 4 hours)
 
-                sLogText = sLogText + Environment.NewLine + "# Número de chamadas calculado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Número de chamadas calculado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
                 pdcServiceCaller oCallerObj = new pdcServiceCaller();
                 AppendOnFile appendOnFile = new AppendOnFile();
@@ -351,7 +348,7 @@ namespace CollectPMUs
                 if (dtToday >= dtStartDaylightSaving && dtToday <= dtEndDaylightSaving)
                     iRepetitionHour--;
 
-                sLogText = sLogText + Environment.NewLine + "# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
                 // --------------------- DEBUG CODE -------------------------------
                 // dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
@@ -454,20 +451,20 @@ namespace CollectPMUs
                     }
                 }
 
-                sLogText = sLogText + Environment.NewLine + "# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 localOutputFile.Close();
 
                 bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
-                sLogText = sLogText + Environment.NewLine + "# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
                 transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
-                sLogText = sLogText + Environment.NewLine + "# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
                 System.IO.File.Delete(sLocalOutputFileName);
                 System.IO.File.Delete(sLocalOutputFileName + ".bz2");
-                sLogText = sLogText + Environment.NewLine + "# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss");
+                sLogText.Append(Environment.NewLine + "# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
-                sLogText = sLogText + Environment.NewLine + "# ================================================================";
+                sLogText.Append(Environment.NewLine + "# ================================================================");
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
 

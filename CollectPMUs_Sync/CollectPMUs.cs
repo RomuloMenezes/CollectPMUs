@@ -237,6 +237,16 @@ namespace CollectPMUs
             }
         }
 
+        private static void bzCompact2Files(string sourceName, string targetName)
+        {
+            ProcessStartInfo p = new ProcessStartInfo();
+            p.FileName = "7za.exe";
+            p.Arguments = "a -tbzip2 \"" + targetName + "\" \"" + sourceName + "\" -mx=9";
+            p.WindowStyle = ProcessWindowStyle.Hidden;
+            Process x = Process.Start(p);
+            x.WaitForExit();
+        }
+
         static void Main(string[] args)
         {
             string dirName = "D:\\openPDC\\Archive\\";
@@ -516,16 +526,6 @@ namespace CollectPMUs
 
             file.Open();
             return file;
-        }
-
-        private static void bzCompact2Files(string sourceName, string targetName)
-        {
-            ProcessStartInfo p = new ProcessStartInfo();
-            p.FileName = "7za.exe";
-            p.Arguments = "a -tbzip2 \"" + targetName + "\" \"" + sourceName + "\" -mx=9";
-            p.WindowStyle = ProcessWindowStyle.Hidden;
-            Process x = Process.Start(p);
-            x.WaitForExit();
         }
 
         private static void ClearArchives()

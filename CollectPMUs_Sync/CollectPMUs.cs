@@ -198,31 +198,42 @@ namespace CollectPMUs
             public DateTime dtInitDateTime;
             public DateTime dtEndDateTime;
             public bool bEndReported = false;
+            public int iTimeoutInSecs = 300;
             // private string responseFromServer = "";
             // public string sReturn = "";
-            private StringBuilder responseFromServer = new StringBuilder();
+            // private StringBuilder responseFromServer = new StringBuilder();
             public StringBuilder sReturn = new StringBuilder();
+            public bool bResponseOk;
 
             public void CallService()
             {
-                responseFromServer.Clear();
+                sReturn.Clear();
 
                 string url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
 
-                WebRequest request = WebRequest.Create(url);
-                request.Credentials = CredentialCache.DefaultCredentials;
-                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                Stream dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream);
-                responseFromServer.Append(reader.ReadToEnd());
+                try
+                {
+                    WebRequest request = WebRequest.Create(url);
+                    request.Credentials = CredentialCache.DefaultCredentials;
+                    request.Timeout = iTimeoutInSecs * 1000;
+                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                    Stream dataStream = response.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    sReturn.Append(reader.ReadToEnd());
 
-                sReturn = responseFromServer.Replace("{\"TimeSeriesDataPoints\":[", "");
-                sReturn = sReturn.Replace("]}", "");
-                sReturn = sReturn.Replace("},{", "}" + Environment.NewLine + "{");
+                    sReturn.Replace("{\"TimeSeriesDataPoints\":[", "");
+                    sReturn.Replace("]}", "");
+                    sReturn.Replace("},{", "}" + Environment.NewLine + "{");
+                    bResponseOk = true;
 
-                reader.Close();
-                dataStream.Close();
-                response.Close();
+                    reader.Close();
+                    dataStream.Close();
+                    response.Close();
+                }
+                catch (System.IO.IOException e)
+                {
+                    bResponseOk = false;
+                }
             }
         }
 
@@ -331,6 +342,9 @@ namespace CollectPMUs
                 DateTime dtToday = DateTime.Today;
                 DateTime dtDateTimeStart = new DateTime(2000, 1, 31);
                 DateTime dtDateTimeEnd;
+                int iTimeoutInSecs;
+                int iLimitOfAttempts;
+                int iNbOfAttempts = 0;
 
                 // iSizeOfPMUsSubset = Convert.ToInt16(ConfigurationManager.AppSettings["TamanhoSubconjuntoPMUs"]);
                 sDailyRepetitionTime = ConfigurationManager.AppSettings["HoraRepeticaoDiaria"];
@@ -358,12 +372,21 @@ namespace CollectPMUs
                 if (dtToday >= dtStartDaylightSaving && dtToday <= dtEndDaylightSaving)
                     iRepetitionHour--;
 
+                iTimeoutInSecs = Convert.ToInt16(ConfigurationManager.AppSettings["TimeoutDoServicoEmSegs"]);
+                oCallerObj.iTimeoutInSecs = iTimeoutInSecs;
+                
+                iLimitOfAttempts = Convert.ToInt16(ConfigurationManager.AppSettings["NumDeTentativasDoServico"]);
+
                 sLogText.Append(Environment.NewLine + "# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
-                // --------------------- DEBUG CODE -------------------------------
-                // dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
-                dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
+                // ---------------------- REAL CODE -------------------------------
+                dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
                 dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                // ----------------------------------------------------------------
+                
+                // --------------------- DEBUG CODE -------------------------------
+                // dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
+                // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
                 // ----------------------------------------------------------------
 
                 sLocalOutputFileName = dtDateTimeStart.ToString("yyyyMMdd") + ".json";
@@ -383,15 +406,14 @@ namespace CollectPMUs
                     else
                     {
                         // ----------------------------------------------- REAL CODE -------------------------------------------------
-                        // dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
-                        // dtDateTimeStart = new DateTime(2015, 1, 19, 3, 00, 00);
-                        // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                        // dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                        dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
+                        dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                        dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
                         // -----------------------------------------------------------------------------------------------------------
 
                         // --------------------- DEBUG CODE -------------------------------
-                        dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
-                        dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                        // dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
+                        // dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
                         // ----------------------------------------------------------------
 
                         for (iIntervalIndex = 0; iIntervalIndex < 6; iIntervalIndex++) // Creates the 6 intervals for each subset
@@ -401,19 +423,30 @@ namespace CollectPMUs
                             oCallerObj.sInputPMUs = sCurrPMUParam;
                             oCallerObj.dtInitDateTime = dtDateTimeStart;
                             oCallerObj.dtEndDateTime = dtDateTimeEnd;
-                            oCallerObj.CallService();
-
-                            appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                            appendOnFile.Append();
+                            iNbOfAttempts = 0;
+                            while(!oCallerObj.bResponseOk&&iNbOfAttempts<iLimitOfAttempts)
+                            {
+                                oCallerObj.CallService();
+                                iNbOfAttempts++;
+                            }
+                            if(iNbOfAttempts==iLimitOfAttempts&&!oCallerObj.bResponseOk)
+                            {
+                                sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            }
+                            else
+                            {
+                                appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                                appendOnFile.Append();
+                            }
 
                             //------------------ REAL CODE ---------------------
-                            // dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                            // dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                            dtDateTimeStart = dtDateTimeStart.AddHours(4);
+                            dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
                             //--------------------------------------------------
 
                             //---------------- DEBUG CODE -------------------
-                            dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                            dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                            // dtDateTimeStart = dtDateTimeStart.AddHours(4);
+                            // dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
                             //-----------------------------------------------
                         }
                         sCurrPMUParam = Convert.ToString(pair.Key);
@@ -424,39 +457,48 @@ namespace CollectPMUs
                 if (iPMUSubsetIndex != 0)
                 {
                     // ----------------------------------------------- REAL CODE -------------------------------------------------
-                    // dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
-                    // dtDateTimeStart = new DateTime(2015, 1, 19, 3, 00, 00);
-                    // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                    // dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                    dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
+                    dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                    dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
                     // -----------------------------------------------------------------------------------------------------------
 
                     // --------------------- DEBUG CODE -------------------------------
-                    dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
-                    dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                    dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                    // dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
+                    // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                    // dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
                     // ----------------------------------------------------------------
 
 
                     for (iIntervalIndex = 0; iIntervalIndex < 6; iIntervalIndex++) // Creates the 6 intervals for each subset
                     {
                         // Filling the parameters
-                        // oCallerObj = new pdcServiceCaller();
                         oCallerObj.sInputPMUs = sCurrPMUParam;
                         oCallerObj.dtInitDateTime = dtDateTimeStart;
                         oCallerObj.dtEndDateTime = dtDateTimeEnd;
-                        oCallerObj.CallService();
-
-                        appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                        appendOnFile.Append();
+                        iNbOfAttempts = 0;
+                        while (!oCallerObj.bResponseOk && iNbOfAttempts < iLimitOfAttempts)
+                        {
+                            oCallerObj.CallService();
+                            iNbOfAttempts++;
+                        }
+                        if (iNbOfAttempts == iLimitOfAttempts && !oCallerObj.bResponseOk)
+                        {
+                            sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                        }
+                        else
+                        {
+                            appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                            appendOnFile.Append();
+                        }
 
                         //------------------ REAL CODE ---------------------
-                        // dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                        // dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                        dtDateTimeStart = dtDateTimeStart.AddHours(4);
+                        dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
                         //--------------------------------------------------
 
                         //---------------- DEBUG CODE -------------------
-                        dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                        dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                        // dtDateTimeStart = dtDateTimeStart.AddHours(4);
+                        // dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
                         //-----------------------------------------------
                     }
                 }

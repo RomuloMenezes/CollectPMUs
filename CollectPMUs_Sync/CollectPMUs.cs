@@ -230,8 +230,9 @@ namespace CollectPMUs
                     dataStream.Close();
                     response.Close();
                 }
-                catch (System.IO.IOException e)
+                catch (Exception e)
                 {
+                    sReturn.Append(e.Message);
                     bResponseOk = false;
                 }
             }
@@ -267,7 +268,6 @@ namespace CollectPMUs
             List<int> freqHistorianId = new List<int>();
             Dictionary<int, string> PMUsDictionary = new Dictionary<int, string>();
             string[] fileEntries = Directory.GetFiles(dirName);
-            int iNbOfPMUsSubsets = 0;
             int iNbOfCalls = 0;
             StreamWriter localOutputFile;
             StreamWriter localLog;
@@ -277,8 +277,8 @@ namespace CollectPMUs
             TransferUtility transfer = new TransferUtility(new AmazonS3Client(Amazon.RegionEndpoint.USEast1));
 
             transfer.Download("log.dat", "pmu-data", "log.dat");
-            localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-            appendOnLog.file = localLog;
+            // localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+            // appendOnLog.file = localLog;
 
             foreach (string fileName in fileEntries)
             {
@@ -307,36 +307,36 @@ namespace CollectPMUs
                     }
                 }
 
-                sLogText.Append(Environment.NewLine + "# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
 
-                // Due to the instability of the openPDC service that will be called, the PMUs will be
-                // divided in subsets of 4, and for each of these subsets the service will be called
-                // 6 times - in intervals of 4 hours. Experiments have shown that the service remains
-                // stable for these values. It tends to crash with more PMUs in each subset and with
-                // intervals longer than 4 hours.
-                // The lines below calculate the variables that will control the sevice calls.
+                // Due to the instability of the openPDC service that will be called, and to the huge
+                // ammount of data returned by it, the PMUs will be divided into subsets, and for each of
+                // these subsets the service will be called a number of times - in intervals whose
+                // duration is calculated as a function of the overall horizon and the duration in hours.
 
-                iNbOfPMUsSubsets = (PMUsDictionary.Count) / 4;
-                if (iNbOfPMUsSubsets * 4 < PMUsDictionary.Count)
-                    iNbOfPMUsSubsets++; // In case PMUsDictionary.Count is not an exact multple of 4
-
-                iNbOfCalls = iNbOfPMUsSubsets * 6; // For each subset the service will be called 6 times
-                // (intervals of 4 hours)
-
-                sLogText.Append(Environment.NewLine + "# Número de chamadas calculado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                // The following lines configure the execution based on the data in the appconfig: its start time, its overal
+                // duration, the number of PMUs in each subset of PMUs and the duration of each service call.
 
                 pdcServiceCaller oCallerObj = new pdcServiceCaller();
                 AppendOnFile appendOnFile = new AppendOnFile();
                 int iPMUSubsetIndex = 0;
                 int iIntervalIndex = 0;
                 string sCurrPMUParam = "";
-                string sDailyRepetitionTime;
-                int iRepetitionHour;
-                int iRepetitionMinute;
-                int iIndexOfSemicolon;
+                string sStartTime;
+                int iStartHour;
+                int iStartMinute;
+                int iStartSecond;
                 string sStartDaylightSaving;
                 string sEndDaylightSaving;
-                int iSizeOfPMUsSubset = 4;
+                int iSizeOfPMUsSubset;
                 DateTime dtStartDaylightSaving;
                 DateTime dtEndDaylightSaving;
                 DateTime dtToday = DateTime.Today;
@@ -345,20 +345,17 @@ namespace CollectPMUs
                 int iTimeoutInSecs;
                 int iLimitOfAttempts;
                 int iNbOfAttempts = 0;
+                int iServiceCallHorizonInHours;
+                int iTotalHorizonInHours;
+                int iStartDay = 1;
+                int iStartMonth = 1;
+                int iStartYear = 2000;
 
-                // iSizeOfPMUsSubset = Convert.ToInt16(ConfigurationManager.AppSettings["TamanhoSubconjuntoPMUs"]);
-                sDailyRepetitionTime = ConfigurationManager.AppSettings["HoraRepeticaoDiaria"];
-                iIndexOfSemicolon = sDailyRepetitionTime.IndexOf(':');
-                if (iIndexOfSemicolon == -1)
-                {
-                    iRepetitionHour = Convert.ToInt16(sDailyRepetitionTime);
-                    iRepetitionMinute = 0;
-                }
-                else
-                {
-                    iRepetitionHour = Convert.ToInt16(sDailyRepetitionTime.Substring(0, 2));
-                    iRepetitionMinute = Convert.ToInt16(sDailyRepetitionTime.Substring(3, 2));
-                }
+                iSizeOfPMUsSubset = Convert.ToInt16(ConfigurationManager.AppSettings["TamanhoSubconjuntoPMUs"]);
+                sStartTime = ConfigurationManager.AppSettings["HoraInicio"];
+                iStartHour = Convert.ToInt16(sStartTime.Substring(0, 2));
+                iStartMinute = Convert.ToInt16(sStartTime.Substring(3, 2));
+                iStartSecond = Convert.ToInt16(sStartTime.Substring(6, 2));
 
                 sStartDaylightSaving = ConfigurationManager.AppSettings["InicioHorarioDeVerao"];
                 sEndDaylightSaving = ConfigurationManager.AppSettings["FimHorarioDeVerao"];
@@ -370,26 +367,49 @@ namespace CollectPMUs
                                                    Convert.ToInt16(sEndDaylightSaving.Substring(0, 2)));
 
                 if (dtToday >= dtStartDaylightSaving && dtToday <= dtEndDaylightSaving)
-                    iRepetitionHour--;
+                    iStartHour--;
+
+                // ---------------------- REAL CODE -------------------------------
+                if (ConfigurationManager.AppSettings["Repeticao"] == "Diaria")
+                    dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iStartHour, iStartMinute, iStartSecond);
+                else
+                    if ((ConfigurationManager.AppSettings["Repeticao"] == "UmaVez"))
+                    {
+                        iStartDay = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(0, 2));
+                        iStartMonth = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(3, 2));
+                        iStartYear = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(6, 4));
+                        dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
+                    }
+                sLocalOutputFileName = dtDateTimeStart.ToString("yyyyMMdd") + ".json";
+                dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                // ----------------------------------------------------------------
+
+                // --------------------- DEBUG CODE -------------------------------
+                // dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
+                // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                // ----------------------------------------------------------------
 
                 iTimeoutInSecs = Convert.ToInt16(ConfigurationManager.AppSettings["TimeoutDoServicoEmSegs"]);
                 oCallerObj.iTimeoutInSecs = iTimeoutInSecs;
                 
                 iLimitOfAttempts = Convert.ToInt16(ConfigurationManager.AppSettings["NumDeTentativasDoServico"]);
 
-                sLogText.Append(Environment.NewLine + "# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                // IMPORTANT: the possibility of iTotalHorizonInHours / iServiceCallHorizonInHours, calculated below,
+                // not being an integer is NOT COVERED in the code.
+                iTotalHorizonInHours = Convert.ToInt16(ConfigurationManager.AppSettings["IntervaloTotalEmHoras"]);
+                iServiceCallHorizonInHours = Convert.ToInt16(ConfigurationManager.AppSettings["IntervaloDoServicoEmHoras"]);
+                iNbOfCalls = iTotalHorizonInHours / iServiceCallHorizonInHours;
 
-                // ---------------------- REAL CODE -------------------------------
-                dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
-                dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                // ----------------------------------------------------------------
-                
-                // --------------------- DEBUG CODE -------------------------------
-                // dtDateTimeStart = new DateTime(2015, 1, 19, 2, 30, 00);
-                // dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                // ----------------------------------------------------------------
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
 
-                sLocalOutputFileName = dtDateTimeStart.ToString("yyyyMMdd") + ".json";
                 localOutputFile = new System.IO.StreamWriter(sLocalOutputFileName, true);
                 appendOnFile.file = localOutputFile;
 
@@ -406,9 +426,18 @@ namespace CollectPMUs
                     else
                     {
                         // ----------------------------------------------- REAL CODE -------------------------------------------------
-                        dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
+                        if (ConfigurationManager.AppSettings["Repeticao"] == "Diaria")
+                            dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iStartHour, iStartMinute, iStartSecond);
+                        else
+                            if ((ConfigurationManager.AppSettings["Repeticao"] == "UmaVez"))
+                            {
+                                iStartDay = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(0, 2));
+                                iStartMonth = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(3, 2));
+                                iStartYear = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(6, 4));
+                                dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
+                            }
                         dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                        dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                        dtDateTimeEnd = dtDateTimeStart.AddHours(iServiceCallHorizonInHours).AddMilliseconds(-1);
                         // -----------------------------------------------------------------------------------------------------------
 
                         // --------------------- DEBUG CODE -------------------------------
@@ -416,13 +445,14 @@ namespace CollectPMUs
                         // dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
                         // ----------------------------------------------------------------
 
-                        for (iIntervalIndex = 0; iIntervalIndex < 6; iIntervalIndex++) // Creates the 6 intervals for each subset
+                        for (iIntervalIndex = 0; iIntervalIndex < iNbOfCalls; iIntervalIndex++) // Creates the intervals for each subset
                         {
                             // Filling the parameters
                             // oCallerObj = new pdcServiceCaller();
                             oCallerObj.sInputPMUs = sCurrPMUParam;
                             oCallerObj.dtInitDateTime = dtDateTimeStart;
                             oCallerObj.dtEndDateTime = dtDateTimeEnd;
+                            oCallerObj.bResponseOk = false;
                             iNbOfAttempts = 0;
                             while(!oCallerObj.bResponseOk&&iNbOfAttempts<iLimitOfAttempts)
                             {
@@ -435,13 +465,16 @@ namespace CollectPMUs
                             }
                             else
                             {
-                                appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                                appendOnFile.Append();
+                                if (oCallerObj.sReturn.Length > 0)
+                                {
+                                    appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                                    appendOnFile.Append();
+                                }
                             }
 
                             //------------------ REAL CODE ---------------------
-                            dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                            dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                            dtDateTimeStart = dtDateTimeStart.AddHours(iServiceCallHorizonInHours);
+                            dtDateTimeEnd = dtDateTimeEnd.AddHours(iServiceCallHorizonInHours);
                             //--------------------------------------------------
 
                             //---------------- DEBUG CODE -------------------
@@ -457,9 +490,18 @@ namespace CollectPMUs
                 if (iPMUSubsetIndex != 0)
                 {
                     // ----------------------------------------------- REAL CODE -------------------------------------------------
-                    dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iRepetitionHour, iRepetitionMinute, 00);
+                    if (ConfigurationManager.AppSettings["Repeticao"] == "Diaria")
+                        dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iStartHour, iStartMinute, iStartSecond);
+                    else
+                        if ((ConfigurationManager.AppSettings["Repeticao"] == "UmaVez"))
+                        {
+                            iStartDay = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(0, 2));
+                            iStartMonth = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(3, 2));
+                            iStartYear = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(6, 4));
+                            dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
+                        }
                     dtDateTimeStart = dtDateTimeStart.AddDays(-1);
-                    dtDateTimeEnd = dtDateTimeStart.AddHours(4).AddMilliseconds(-1);
+                    dtDateTimeEnd = dtDateTimeStart.AddHours(iServiceCallHorizonInHours).AddMilliseconds(-1);
                     // -----------------------------------------------------------------------------------------------------------
 
                     // --------------------- DEBUG CODE -------------------------------
@@ -469,7 +511,7 @@ namespace CollectPMUs
                     // ----------------------------------------------------------------
 
 
-                    for (iIntervalIndex = 0; iIntervalIndex < 6; iIntervalIndex++) // Creates the 6 intervals for each subset
+                    for (iIntervalIndex = 0; iIntervalIndex < iNbOfCalls; iIntervalIndex++) // Creates the 6 intervals for each subset
                     {
                         // Filling the parameters
                         oCallerObj.sInputPMUs = sCurrPMUParam;
@@ -484,16 +526,23 @@ namespace CollectPMUs
                         if (iNbOfAttempts == iLimitOfAttempts && !oCallerObj.bResponseOk)
                         {
                             sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            appendOnLog.sTextToAppend = sLogText;
+                            appendOnLog.Append();
+                            sLogText.Clear();
                         }
                         else
                         {
-                            appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                            appendOnFile.Append();
+                            if(oCallerObj.sReturn.Length>0)
+                            {
+                                appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                                appendOnFile.Append();
+                            }
                         }
 
                         //------------------ REAL CODE ---------------------
-                        dtDateTimeStart = dtDateTimeStart.AddHours(4);
-                        dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
+                        dtDateTimeStart = dtDateTimeStart.AddHours(iServiceCallHorizonInHours);
+                        dtDateTimeEnd = dtDateTimeEnd.AddHours(iServiceCallHorizonInHours);
                         //--------------------------------------------------
 
                         //---------------- DEBUG CODE -------------------
@@ -503,25 +552,66 @@ namespace CollectPMUs
                     }
                 }
 
-                sLogText.Append(Environment.NewLine + "# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
+
                 localOutputFile.Close();
 
                 bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
-                sLogText.Append(Environment.NewLine + "# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
 
                 transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
-                sLogText.Append(Environment.NewLine + "# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
 
                 System.IO.File.Delete(sLocalOutputFileName);
                 System.IO.File.Delete(sLocalOutputFileName + ".bz2");
-                sLogText.Append(Environment.NewLine + "# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
 
-                sLogText.Append(Environment.NewLine + "# ================================================================");
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
-
+                sLogText.Clear();
                 localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
+
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
+                appendOnLog.file = localLog;
+                sLogText.Append("# ================================================================");
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
+
                 transfer.Upload("log.dat", "pmu-data");
+                System.IO.File.Delete("log.dat");
 
                 ClearArchives();
             }

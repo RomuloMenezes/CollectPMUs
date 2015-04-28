@@ -262,7 +262,7 @@ namespace CollectPMUs
         static void Main(string[] args)
         {
             string dirName = ConfigurationManager.AppSettings["LocalizacaoArchive"];
-            dirName = "D:\\openPDC\\ArchiveTemp";
+            // dirName = "D:\\openPDC\\ArchiveTemp";
             string name = "";
             bool found = false;
             List<string> PMUNames = new List<string>();

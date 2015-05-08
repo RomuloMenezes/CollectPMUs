@@ -272,6 +272,8 @@ namespace CollectPMUs
             int iNbOfCalls = 0;
             StreamWriter localOutputFile;
             StreamWriter localLog;
+            StreamWriter serviceLog;
+            DateTime now;
             AppendOnFile appendOnLog = new AppendOnFile();
             string sLocalOutputFileName = "";
             StringBuilder sLogText = new StringBuilder();
@@ -305,6 +307,11 @@ namespace CollectPMUs
                         }
                     }
                 }
+
+                // ---------------------------------------- Opening service log file -------------------------------------------------
+                // Remember this file is recreated at each execution
+                serviceLog = new System.IO.StreamWriter("service.log", false, System.Text.Encoding.UTF8);
+                // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
                 localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
@@ -457,6 +464,9 @@ namespace CollectPMUs
                             iNbOfAttempts = 0;
                             while(!oCallerObj.bResponseOk&&iNbOfAttempts<iLimitOfAttempts)
                             {
+                                now = DateTime.Now;
+                                serviceLog.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
+                                Console.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
                                 oCallerObj.CallService();
                                 iNbOfAttempts++;
                             }
@@ -635,6 +645,10 @@ namespace CollectPMUs
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 localLog.Close();
+                // -------------------------------------------------------------------------------------------------------------------
+
+                // ---------------------------------------- Closing service log file -------------------------------------------------
+                serviceLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 transfer.Upload("log.dat", "pmu-data");

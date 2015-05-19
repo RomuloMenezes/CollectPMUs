@@ -207,12 +207,10 @@ namespace CollectPMUs
 
             public void CallService()
             {
-                sReturn.Clear();
-
-                string url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
-
                 try
                 {
+                    sReturn.Clear();
+                    string url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
                     WebRequest request = WebRequest.Create(url);
                     request.Credentials = CredentialCache.DefaultCredentials;
                     request.Timeout = iTimeoutInSecs * 1000;
@@ -240,12 +238,15 @@ namespace CollectPMUs
 
         private class AppendOnFile
         {
-            public StreamWriter file;
+            public string file;
             public StringBuilder sTextToAppend = new StringBuilder();
 
             public void Append()
             {
-                file.WriteLine(sTextToAppend);
+                StreamWriter localOutputFile;
+                localOutputFile = new System.IO.StreamWriter(file, true);
+                localOutputFile.Write(sTextToAppend);
+                localOutputFile.Close();
             }
         }
 
@@ -270,8 +271,6 @@ namespace CollectPMUs
             Dictionary<int, string> PMUsDictionary = new Dictionary<int, string>();
             string[] fileEntries = Directory.GetFiles(dirName);
             int iNbOfCalls = 0;
-            StreamWriter localOutputFile;
-            StreamWriter localLog;
             StreamWriter serviceLog;
             DateTime now;
             AppendOnFile appendOnLog = new AppendOnFile();
@@ -314,13 +313,11 @@ namespace CollectPMUs
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // Due to the instability of the openPDC service that will be called, and to the huge
@@ -377,7 +374,10 @@ namespace CollectPMUs
 
                 // ---------------------- REAL CODE -------------------------------
                 if (ConfigurationManager.AppSettings["Repeticao"] == "Diaria")
+                {
                     dtDateTimeStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, iStartHour, iStartMinute, iStartSecond);
+                    dtDateTimeStart = dtDateTimeStart.AddDays(-1);
+                }
                 else
                     if ((ConfigurationManager.AppSettings["Repeticao"] == "UmaVez"))
                     {
@@ -387,7 +387,6 @@ namespace CollectPMUs
                         dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
                     }
                 sLocalOutputFileName = dtDateTimeStart.ToString("yyyyMMdd") + ".json";
-                dtDateTimeStart = dtDateTimeStart.AddDays(-1);
                 // ----------------------------------------------------------------
 
                 // --------------------- DEBUG CODE -------------------------------
@@ -407,17 +406,14 @@ namespace CollectPMUs
                 iNbOfCalls = iTotalHorizonInHours / iServiceCallHorizonInHours;
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
-                localOutputFile = new System.IO.StreamWriter(sLocalOutputFileName, true);
-                appendOnFile.file = localOutputFile;
+                appendOnFile.file = sLocalOutputFileName;
 
                 foreach (var pair in PMUsDictionary)
                 {
@@ -473,14 +469,12 @@ namespace CollectPMUs
                             if(iNbOfAttempts==iLimitOfAttempts&&!oCallerObj.bResponseOk)
                             {
                                 // ------------------------------------------ Writing to log file ---------------------------------------------------
-                                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                                appendOnLog.file = localLog;
+                                appendOnLog.file = "log.dat";
                                 sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                 sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                 appendOnLog.sTextToAppend = sLogText;
                                 appendOnLog.Append();
                                 sLogText.Clear();
-                                localLog.Close();
                                 // ------------------------------------------------------------------------------------------------------------------
                             }
                             else
@@ -493,13 +487,11 @@ namespace CollectPMUs
                                 else
                                 {
                                     // ------------------------------------------ Writing to log file ---------------------------------------------------
-                                    localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                                    appendOnLog.file = localLog;
+                                    appendOnLog.file = "log.dat";
                                     sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                     appendOnLog.sTextToAppend = sLogText;
                                     appendOnLog.Append();
                                     sLogText.Clear();
-                                    localLog.Close();
                                     // ------------------------------------------------------------------------------------------------------------------
                                 }
                             }
@@ -558,14 +550,12 @@ namespace CollectPMUs
                         if (iNbOfAttempts == iLimitOfAttempts && !oCallerObj.bResponseOk)
                         {
                             // ------------------------------------------ Writing to log file ---------------------------------------------------
-                            localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                            appendOnLog.file = localLog;
+                            appendOnLog.file = "log.dat";
                             sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                             sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                             appendOnLog.sTextToAppend = sLogText;
                             appendOnLog.Append();
                             sLogText.Clear();
-                            localLog.Close();
                             // ------------------------------------------------------------------------------------------------------------------
                         }
                         else
@@ -590,61 +580,49 @@ namespace CollectPMUs
                 }
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
-
-                localOutputFile.Close();
 
                 bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 System.IO.File.Delete(sLocalOutputFileName);
                 System.IO.File.Delete(sLocalOutputFileName + ".bz2");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                localLog = new System.IO.StreamWriter("log.dat", true, System.Text.Encoding.UTF8);
-                appendOnLog.file = localLog;
+                appendOnLog.file = "log.dat";
                 sLogText.Append("# ================================================================");
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
-                localLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ---------------------------------------- Closing service log file -------------------------------------------------

@@ -495,8 +495,11 @@ namespace CollectPMUs
                             {
                                 if (oCallerObj.sReturn.Length > 0)
                                 {
+                                    // ------------------------------------------ Writing to output file ----------------------------------------------------
+                                    appendOnFile.file = sLocalOutputFileName;
                                     appendOnFile.sTextToAppend = oCallerObj.sReturn;
                                     appendOnFile.Append();
+                                    // ----------------------------------------------------------------------------------------------------------------------
                                 }
                                 else
                                 {
@@ -576,8 +579,11 @@ namespace CollectPMUs
                         {
                             if(oCallerObj.sReturn.Length>0)
                             {
+                                // ------------------------------------------ Writing to output file ----------------------------------------------------
+                                appendOnFile.file = sLocalOutputFileName;
                                 appendOnFile.sTextToAppend = oCallerObj.sReturn;
                                 appendOnFile.Append();
+                                // ----------------------------------------------------------------------------------------------------------------------
                             }
                         }
 

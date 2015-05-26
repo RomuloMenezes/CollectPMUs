@@ -230,6 +230,7 @@ namespace CollectPMUs
                 }
                 catch (Exception e)
                 {
+                    sReturn.Clear();
                     sReturn.Append(e.Message);
                     bResponseOk = false;
                 }
@@ -245,7 +246,7 @@ namespace CollectPMUs
             {
                 StreamWriter localOutputFile;
                 localOutputFile = new System.IO.StreamWriter(file, true);
-                localOutputFile.Write(sTextToAppend);
+                localOutputFile.WriteLine(sTextToAppend);
                 localOutputFile.Close();
             }
         }
@@ -271,7 +272,6 @@ namespace CollectPMUs
             Dictionary<int, string> PMUsDictionary = new Dictionary<int, string>();
             string[] fileEntries = Directory.GetFiles(dirName);
             int iNbOfCalls = 0;
-            StreamWriter serviceLog;
             DateTime now;
             AppendOnFile appendOnLog = new AppendOnFile();
             string sLocalOutputFileName = "";
@@ -307,9 +307,10 @@ namespace CollectPMUs
                     }
                 }
 
-                // ---------------------------------------- Opening service log file -------------------------------------------------
-                // Remember this file is recreated at each execution
-                serviceLog = new System.IO.StreamWriter("service.log", false, System.Text.Encoding.UTF8);
+                // ---------------------------------------- Deleting service log file -------------------------------------------------
+                // Because this file must be recreated at each execution
+                if (File.Exists("service.log"))
+                    File.Delete("service.log");
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
@@ -356,9 +357,18 @@ namespace CollectPMUs
 
                 iSizeOfPMUsSubset = Convert.ToInt16(ConfigurationManager.AppSettings["TamanhoSubconjuntoPMUs"]);
                 sStartTime = ConfigurationManager.AppSettings["HoraInicio"];
-                iStartHour = Convert.ToInt16(sStartTime.Substring(0, 2));
-                iStartMinute = Convert.ToInt16(sStartTime.Substring(3, 2));
-                iStartSecond = Convert.ToInt16(sStartTime.Substring(6, 2));
+                if (ConfigurationManager.AppSettings["Repeticao"] == "UmaVez")
+                {
+                    iStartHour = Convert.ToInt16(sStartTime.Substring(0, 2));
+                    iStartMinute = Convert.ToInt16(sStartTime.Substring(3, 2));
+                    iStartSecond = Convert.ToInt16(sStartTime.Substring(6, 2));
+                }
+                else
+                {
+                    iStartHour = 3; // 03:00 GMT = 00:00 GMT-3. A piece of code ahead treats daylight saving time.
+                    iStartMinute = 0;
+                    iStartSecond = 0;
+                }
 
                 sStartDaylightSaving = ConfigurationManager.AppSettings["InicioHorarioDeVerao"];
                 sEndDaylightSaving = ConfigurationManager.AppSettings["FimHorarioDeVerao"];
@@ -461,7 +471,11 @@ namespace CollectPMUs
                             while(!oCallerObj.bResponseOk&&iNbOfAttempts<iLimitOfAttempts)
                             {
                                 now = DateTime.Now;
-                                serviceLog.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
+                                appendOnLog.file = "service.log";
+                                sLogText.Append(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
+                                appendOnLog.sTextToAppend = sLogText;
+                                appendOnLog.Append();
+                                sLogText.Clear();
                                 Console.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
                                 oCallerObj.CallService();
                                 iNbOfAttempts++;
@@ -623,10 +637,6 @@ namespace CollectPMUs
                 sLogText.Append("# ================================================================");
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
-                // -------------------------------------------------------------------------------------------------------------------
-
-                // ---------------------------------------- Closing service log file -------------------------------------------------
-                serviceLog.Close();
                 // -------------------------------------------------------------------------------------------------------------------
 
                 transfer.Upload("log.dat", "pmu-data");

@@ -209,24 +209,50 @@ namespace CollectPMUs
             {
                 try
                 {
+                    // ------------------------- DEBUG CODE -------------------------
+                    Process proc = Process.GetCurrentProcess();
+                    string memory = proc.PrivateMemorySize64.ToString("N0");
+                    string memory2 = GC.GetTotalMemory(true).ToString("N0");
+                    // --------------------------------------------------------------
+
                     sReturn.Clear();
+                    sReturn = new StringBuilder();
+                    GC.Collect(3, GCCollectionMode.Forced);
+
                     string url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
                     WebRequest request = WebRequest.Create(url);
                     request.Credentials = CredentialCache.DefaultCredentials;
                     request.Timeout = iTimeoutInSecs * 1000;
-                    HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                    Stream dataStream = response.GetResponseStream();
-                    StreamReader reader = new StreamReader(dataStream);
-                    sReturn.Append(reader.ReadToEnd());
+                    //HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                    //Stream dataStream = response.GetResponseStream();
+                    //StreamReader reader = new StreamReader(dataStream);
+                    //sReturn.Append(reader.ReadToEnd());
 
-                    sReturn.Replace("{\"TimeSeriesDataPoints\":[", "");
-                    sReturn.Replace("]}", "");
-                    sReturn.Replace("},{", "}" + Environment.NewLine + "{");
+                    //dataStream.Dispose();
+                    //reader.Dispose();
+
+                    //sReturn.Replace("{\"TimeSeriesDataPoints\":[", "");
+                    //sReturn.Replace("]}", "");
+                    //sReturn.Replace("},{", "}" + Environment.NewLine + "{");
+                    //bResponseOk = true;
+
+                    //reader.Close();
+                    //dataStream.Close();
+                    //response.Close();
+                    
+                    using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                    {
+                        using (Stream dataStream = response.GetResponseStream())
+                        using (StreamReader reader = new StreamReader(dataStream))
+                        {
+                            sReturn.Append(reader.ReadToEnd());
+                            sReturn.Replace("{\"TimeSeriesDataPoints\":[", "");
+                            sReturn.Replace("]}", "");
+                            sReturn.Replace("},{", "}" + Environment.NewLine + "{");
+                        }
+                    }
+
                     bResponseOk = true;
-
-                    reader.Close();
-                    dataStream.Close();
-                    response.Close();
                 }
                 catch (Exception e)
                 {
@@ -240,14 +266,16 @@ namespace CollectPMUs
         private class AppendOnFile
         {
             public string file;
-            public StringBuilder sTextToAppend = new StringBuilder();
+            //public StringBuilder sTextToAppend = new StringBuilder();
+            public StringBuilder sTextToAppend = null;
 
             public void Append()
             {
                 StreamWriter localOutputFile;
-                localOutputFile = new System.IO.StreamWriter(file, true);
-                localOutputFile.WriteLine(sTextToAppend);
-                localOutputFile.Close();
+                using (localOutputFile = new System.IO.StreamWriter(file, true))
+                    localOutputFile.WriteLine(sTextToAppend);
+
+                sTextToAppend = null;
             }
         }
 
@@ -472,11 +500,11 @@ namespace CollectPMUs
                             {
                                 now = DateTime.Now;
                                 appendOnLog.file = "service.log";
-                                sLogText.Append(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
+                                sLogText.Append(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts) + " - Mem: " + Process.GetCurrentProcess().PrivateMemorySize64.ToString("N0"));
                                 appendOnLog.sTextToAppend = sLogText;
                                 appendOnLog.Append();
                                 sLogText.Clear();
-                                Console.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts));
+                                Console.WriteLine(Convert.ToString(now) + ": PMUs: " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - Attempt: " + Convert.ToString(iNbOfAttempts) + " - Mem: " + Process.GetCurrentProcess().PrivateMemorySize64.ToString("N0"));
                                 oCallerObj.CallService();
                                 iNbOfAttempts++;
                             }
@@ -499,13 +527,14 @@ namespace CollectPMUs
                                     appendOnFile.file = sLocalOutputFileName;
                                     appendOnFile.sTextToAppend = oCallerObj.sReturn;
                                     appendOnFile.Append();
+                                    oCallerObj.sReturn.Clear();
                                     // ----------------------------------------------------------------------------------------------------------------------
                                 }
                                 else
                                 {
                                     // ------------------------------------------ Writing to log file ---------------------------------------------------
                                     appendOnLog.file = "log.dat";
-                                    sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                                    sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                     appendOnLog.sTextToAppend = sLogText;
                                     appendOnLog.Append();
                                     sLogText.Clear();

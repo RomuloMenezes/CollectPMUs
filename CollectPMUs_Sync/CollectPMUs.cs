@@ -306,7 +306,7 @@ namespace CollectPMUs
             StringBuilder sLogText = new StringBuilder();
             TransferUtility transfer = new TransferUtility(new AmazonS3Client(Amazon.RegionEndpoint.USEast1));
 
-            transfer.Download("log.dat", "pmu-data", "log.dat");
+            transfer.Download("PMU_Service.log", "pmu-data", "PMU_Service.log");
 
             foreach (string fileName in fileEntries)
             {
@@ -342,7 +342,7 @@ namespace CollectPMUs
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# PMUs recuperados - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -444,7 +444,7 @@ namespace CollectPMUs
                 iNbOfCalls = iTotalHorizonInHours / iServiceCallHorizonInHours;
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Início das chamadas do serviço - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -511,8 +511,8 @@ namespace CollectPMUs
                             if(iNbOfAttempts==iLimitOfAttempts&&!oCallerObj.bResponseOk)
                             {
                                 // ------------------------------------------ Writing to log file ---------------------------------------------------
-                                appendOnLog.file = "log.dat";
-                                sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                                appendOnLog.file = "PMU_Service.log";
+                                sLogText.Append("# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                 sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                 appendOnLog.sTextToAppend = sLogText;
                                 appendOnLog.Append();
@@ -532,13 +532,13 @@ namespace CollectPMUs
                                 }
                                 else
                                 {
-                                    // ------------------------------------------ Writing to log file ---------------------------------------------------
-                                    appendOnLog.file = "log.dat";
-                                    sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                                    appendOnLog.sTextToAppend = sLogText;
-                                    appendOnLog.Append();
-                                    sLogText.Clear();
-                                    // ------------------------------------------------------------------------------------------------------------------
+                                // ------------------------------------------ Writing to log file ---------------------------------------------------
+                                appendOnLog.file = "PMU_Service.log";
+                                sLogText.Append("# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                                appendOnLog.sTextToAppend = sLogText;
+                                appendOnLog.Append();
+                                sLogText.Clear();
+                                // ------------------------------------------------------------------------------------------------------------------
                                 }
                             }
 
@@ -596,8 +596,8 @@ namespace CollectPMUs
                         if (iNbOfAttempts == iLimitOfAttempts && !oCallerObj.bResponseOk)
                         {
                             // ------------------------------------------ Writing to log file ---------------------------------------------------
-                            appendOnLog.file = "log.dat";
-                            sLogText.Append(Environment.NewLine + "# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            appendOnLog.file = "PMU_Service.log";
+                            sLogText.Append("# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                             sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                             appendOnLog.sTextToAppend = sLogText;
                             appendOnLog.Append();
@@ -629,7 +629,7 @@ namespace CollectPMUs
                 }
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -639,7 +639,7 @@ namespace CollectPMUs
                 bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -649,7 +649,7 @@ namespace CollectPMUs
                 transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -660,7 +660,7 @@ namespace CollectPMUs
                 System.IO.File.Delete(sLocalOutputFileName + ".bz2");
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
@@ -668,14 +668,14 @@ namespace CollectPMUs
                 // -------------------------------------------------------------------------------------------------------------------
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "log.dat";
+                appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# ================================================================");
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 // -------------------------------------------------------------------------------------------------------------------
 
-                transfer.Upload("log.dat", "pmu-data");
-                System.IO.File.Delete("log.dat");
+                transfer.Upload("PMU_Service.log", "pmu-data");
+                System.IO.File.Delete("PMU_Service.log");
 
                 ClearArchives();
             }

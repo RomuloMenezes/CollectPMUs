@@ -252,7 +252,11 @@ namespace CollectPMUs
                         }
                     }
 
-                    bResponseOk = true;
+                    if(sReturn.Length > 0)
+                        bResponseOk = true;
+                    else
+                        // <<<<<<< DEBUG >>>>>>>
+                        bResponseOk = false;
                 }
                 catch (Exception e)
                 {
@@ -463,7 +467,7 @@ namespace CollectPMUs
                             sCurrPMUParam = sCurrPMUParam + "," + pair.Key;
                         iPMUSubsetIndex++;
                     }
-                    else
+                    if (iPMUSubsetIndex == iSizeOfPMUsSubset)
                     {
                         // ----------------------------------------------- REAL CODE -------------------------------------------------
                         if (ConfigurationManager.AppSettings["Repeticao"] == "Diaria")
@@ -513,7 +517,10 @@ namespace CollectPMUs
                                 // ------------------------------------------ Writing to log file ---------------------------------------------------
                                 appendOnLog.file = "PMU_Service.log";
                                 sLogText.Append("# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                                sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                                if (oCallerObj.sReturn.Length > 0)
+                                    sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                                else
+                                    sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                                 appendOnLog.sTextToAppend = sLogText;
                                 appendOnLog.Append();
                                 sLogText.Clear();
@@ -521,25 +528,12 @@ namespace CollectPMUs
                             }
                             else
                             {
-                                if (oCallerObj.sReturn.Length > 0)
-                                {
-                                    // ------------------------------------------ Writing to output file ----------------------------------------------------
-                                    appendOnFile.file = sLocalOutputFileName;
-                                    appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                                    appendOnFile.Append();
-                                    oCallerObj.sReturn.Clear();
-                                    // ----------------------------------------------------------------------------------------------------------------------
-                                }
-                                else
-                                {
-                                // ------------------------------------------ Writing to log file ---------------------------------------------------
-                                appendOnLog.file = "PMU_Service.log";
-                                sLogText.Append("# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                                appendOnLog.sTextToAppend = sLogText;
-                                appendOnLog.Append();
-                                sLogText.Clear();
-                                // ------------------------------------------------------------------------------------------------------------------
-                                }
+                                // ------------------------------------------ Writing to output file ----------------------------------------------------
+                                appendOnFile.file = sLocalOutputFileName;
+                                appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                                appendOnFile.Append();
+                                oCallerObj.sReturn.Clear();
+                                // ----------------------------------------------------------------------------------------------------------------------
                             }
 
                             //------------------ REAL CODE ---------------------
@@ -552,8 +546,8 @@ namespace CollectPMUs
                             // dtDateTimeEnd = dtDateTimeEnd.AddHours(4);
                             //-----------------------------------------------
                         }
-                        sCurrPMUParam = Convert.ToString(pair.Key);
-                        iPMUSubsetIndex = 1;
+                        // sCurrPMUParam = Convert.ToString(pair.Key);
+                        iPMUSubsetIndex = 0;
                     }
                 }
 
@@ -598,7 +592,10 @@ namespace CollectPMUs
                             // ------------------------------------------ Writing to log file ---------------------------------------------------
                             appendOnLog.file = "PMU_Service.log";
                             sLogText.Append("# Dados não gerados para " + sCurrPMUParam + " " + dtDateTimeStart.ToString("dd/MM/yyyy HH:mm") + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                            sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            if (oCallerObj.sReturn.Length > 0)
+                                sLogText.Append(Environment.NewLine + "# *** Exception *** -> " + oCallerObj.sReturn + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                            else
+                                sLogText.Append(Environment.NewLine + "# Nenhum dado retornado para " + sCurrPMUParam + " - InitDateTime: " + Convert.ToString(dtDateTimeStart) + " - EndDateTime: " + Convert.ToString(dtDateTimeEnd) + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                             appendOnLog.sTextToAppend = sLogText;
                             appendOnLog.Append();
                             sLogText.Clear();
@@ -606,14 +603,12 @@ namespace CollectPMUs
                         }
                         else
                         {
-                            if(oCallerObj.sReturn.Length>0)
-                            {
-                                // ------------------------------------------ Writing to output file ----------------------------------------------------
-                                appendOnFile.file = sLocalOutputFileName;
-                                appendOnFile.sTextToAppend = oCallerObj.sReturn;
-                                appendOnFile.Append();
-                                // ----------------------------------------------------------------------------------------------------------------------
-                            }
+                            // ------------------------------------------ Writing to output file ----------------------------------------------------
+                            appendOnFile.file = sLocalOutputFileName;
+                            appendOnFile.sTextToAppend = oCallerObj.sReturn;
+                            appendOnFile.Append();
+                            oCallerObj.sReturn.Clear();
+                            // ----------------------------------------------------------------------------------------------------------------------
                         }
 
                         //------------------ REAL CODE ---------------------

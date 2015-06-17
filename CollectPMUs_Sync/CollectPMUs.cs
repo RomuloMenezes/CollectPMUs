@@ -428,7 +428,7 @@ namespace CollectPMUs
                         iStartYear = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(6, 4));
                         dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
                     }
-                sLocalOutputFileName = dtDateTimeStart.ToString("yyyyMMdd") + ".json";
+                sLocalOutputFileName = AppDomain.CurrentDomain.BaseDirectory + "\\" + dtDateTimeStart.ToString("yyyyMMdd") + ".json";
                 // ----------------------------------------------------------------
 
                 // --------------------- DEBUG CODE -------------------------------

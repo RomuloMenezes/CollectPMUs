@@ -207,6 +207,7 @@ namespace CollectPMUs
 
             public void CallService()
             {
+                string url = "";
                 try
                 {
                     // ------------------------- DEBUG CODE -------------------------
@@ -219,7 +220,7 @@ namespace CollectPMUs
                     sReturn = new StringBuilder();
                     GC.Collect(3, GCCollectionMode.Forced);
 
-                    string url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
+                    url = "http://localhost:6152/historian/timeseriesdata/read/historic/" + sInputPMUs + "/" + dtInitDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/" + dtEndDateTime.ToString("dd-MMM-yyyy HH:mm:ss.fff") + "/json";
                     WebRequest request = WebRequest.Create(url);
                     request.Credentials = CredentialCache.DefaultCredentials;
                     request.Timeout = iTimeoutInSecs * 1000;
@@ -262,6 +263,7 @@ namespace CollectPMUs
                 {
                     sReturn.Clear();
                     sReturn.Append(e.Message);
+                    sReturn.Append(Environment.NewLine + url);
                     bResponseOk = false;
                 }
             }
@@ -307,10 +309,13 @@ namespace CollectPMUs
             DateTime now;
             AppendOnFile appendOnLog = new AppendOnFile();
             string sLocalOutputFileName = "";
+            string sAppPath = "";
             StringBuilder sLogText = new StringBuilder();
             TransferUtility transfer = new TransferUtility(new AmazonS3Client(Amazon.RegionEndpoint.USEast1));
 
-            transfer.Download("PMU_Service.log", "pmu-data", "PMU_Service.log");
+            sAppPath = AppDomain.CurrentDomain.BaseDirectory;
+
+            transfer.Download(sAppPath + "PMU_Service.log", "pmu-data", "PMU_Service.log");
 
             foreach (string fileName in fileEntries)
             {
@@ -428,7 +433,7 @@ namespace CollectPMUs
                         iStartYear = Convert.ToInt16(ConfigurationManager.AppSettings["DataInicio"].Substring(6, 4));
                         dtDateTimeStart = new DateTime(iStartYear, iStartMonth, iStartDay, iStartHour, iStartMinute, iStartSecond);
                     }
-                sLocalOutputFileName = AppDomain.CurrentDomain.BaseDirectory + "\\" + dtDateTimeStart.ToString("yyyyMMdd") + ".json";
+                sLocalOutputFileName = sAppPath + dtDateTimeStart.ToString("yyyyMMdd") + ".json";
                 // ----------------------------------------------------------------
 
                 // --------------------- DEBUG CODE -------------------------------
@@ -626,6 +631,7 @@ namespace CollectPMUs
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
                 appendOnLog.file = "PMU_Service.log";
                 sLogText.Append("# Arquivo de saída gerado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                sLogText.Append(Environment.NewLine + "# Arquivo de saída: " + sLocalOutputFileName + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                 appendOnLog.sTextToAppend = sLogText;
                 appendOnLog.Append();
                 sLogText.Clear();

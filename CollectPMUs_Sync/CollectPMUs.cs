@@ -287,8 +287,11 @@ namespace CollectPMUs
 
         private static void bzCompact2Files(string sourceName, string targetName)
         {
+            string sAppPath = "";
+
+            sAppPath = AppDomain.CurrentDomain.BaseDirectory;
             ProcessStartInfo p = new ProcessStartInfo();
-            p.FileName = "7za.exe";
+            p.FileName = sAppPath + "\\7za.exe";
             p.Arguments = "a -tbzip2 \"" + targetName + "\" \"" + sourceName + "\" -mx=9";
             p.WindowStyle = ProcessWindowStyle.Hidden;
             Process x = Process.Start(p);
@@ -637,36 +640,50 @@ namespace CollectPMUs
                 sLogText.Clear();
                 // -------------------------------------------------------------------------------------------------------------------
 
-                bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
+                try
+                {
+                    bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
 
-                // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "PMU_Service.log";
-                sLogText.Append("# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                appendOnLog.sTextToAppend = sLogText;
-                appendOnLog.Append();
-                sLogText.Clear();
-                // -------------------------------------------------------------------------------------------------------------------
+                    // ------------------------------------------ Writing to log file ----------------------------------------------------
+                    appendOnLog.file = "PMU_Service.log";
+                    sLogText.Append("# Arquivo de saída compactado - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    appendOnLog.sTextToAppend = sLogText;
+                    appendOnLog.Append();
+                    sLogText.Clear();
+                    // -------------------------------------------------------------------------------------------------------------------
 
-                transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
+                    transfer.Upload(sLocalOutputFileName + ".bz2", "pmu-data");
 
-                // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "PMU_Service.log";
-                sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                appendOnLog.sTextToAppend = sLogText;
-                appendOnLog.Append();
-                sLogText.Clear();
-                // -------------------------------------------------------------------------------------------------------------------
+                    // ------------------------------------------ Writing to log file ----------------------------------------------------
+                    appendOnLog.file = "PMU_Service.log";
+                    sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    appendOnLog.sTextToAppend = sLogText;
+                    appendOnLog.Append();
+                    sLogText.Clear();
+                    // -------------------------------------------------------------------------------------------------------------------
 
-                System.IO.File.Delete(sLocalOutputFileName);
-                System.IO.File.Delete(sLocalOutputFileName + ".bz2");
+                    System.IO.File.Delete(sLocalOutputFileName);
+                    System.IO.File.Delete(sLocalOutputFileName + ".bz2");
 
-                // ------------------------------------------ Writing to log file ----------------------------------------------------
-                appendOnLog.file = "PMU_Service.log";
-                sLogText.Append("# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
-                appendOnLog.sTextToAppend = sLogText;
-                appendOnLog.Append();
-                sLogText.Clear();
-                // -------------------------------------------------------------------------------------------------------------------
+                    // ------------------------------------------ Writing to log file ----------------------------------------------------
+                    appendOnLog.file = "PMU_Service.log";
+                    sLogText.Append("# Arquivos locais removidos - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    appendOnLog.sTextToAppend = sLogText;
+                    appendOnLog.Append();
+                    sLogText.Clear();
+                    // -------------------------------------------------------------------------------------------------------------------
+                }
+                catch (Exception e)
+                {
+                    // ------------------------------------------ Writing to log file ----------------------------------------------------
+                    appendOnLog.file = "PMU_Service.log";
+                    sLogText.Append("# ERRO na compactação do arquivo de saída - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    sLogText.Append(Environment.NewLine + e.Message + " - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    appendOnLog.sTextToAppend = sLogText;
+                    appendOnLog.Append();
+                    sLogText.Clear();
+                    // -------------------------------------------------------------------------------------------------------------------
+                }
 
                 // ------------------------------------------ Writing to log file ----------------------------------------------------
                 appendOnLog.file = "PMU_Service.log";

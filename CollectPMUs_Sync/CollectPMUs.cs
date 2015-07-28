@@ -640,6 +640,16 @@ namespace CollectPMUs
                 sLogText.Clear();
                 // -------------------------------------------------------------------------------------------------------------------
 
+                transfer.Upload(sLocalOutputFileName, "pmu-data");
+
+                // ------------------------------------------ Writing to log file ----------------------------------------------------
+                appendOnLog.file = "PMU_Service.log";
+                sLogText.Append("# Arquivo de saída (não compactado) carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                appendOnLog.sTextToAppend = sLogText;
+                appendOnLog.Append();
+                sLogText.Clear();
+                // -------------------------------------------------------------------------------------------------------------------
+
                 try
                 {
                     bzCompact2Files(sLocalOutputFileName, sLocalOutputFileName + ".bz2");
@@ -656,7 +666,7 @@ namespace CollectPMUs
 
                     // ------------------------------------------ Writing to log file ----------------------------------------------------
                     appendOnLog.file = "PMU_Service.log";
-                    sLogText.Append("# Arquivo de saída carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
+                    sLogText.Append("# Arquivo de saída (compactado) carregado com sucesso - " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss"));
                     appendOnLog.sTextToAppend = sLogText;
                     appendOnLog.Append();
                     sLogText.Clear();
